@@ -68,6 +68,7 @@ const res2 = await fetch('/api/chat', {
   - [Особенности работы](#особенности-работы)
   - [Поддержка streaming режима](#поддержка-streaming-режима)
   - [Примеры использования с OpenAI SDK](#примеры-использования-с-openai-sdk)
+- [🎨 Генерация изображений](#-генерация-изображений)
 - [🔧 Особенности реализации](#-особенности-реализации)
 
 ---
@@ -807,5 +808,92 @@ async function uploadAndAnalyzeImage(imagePath) {
 >
 > 1. Некоторые специфичные для OpenAI параметры (например, `logprobs`, `functions` и т.д.) не поддерживаются.
 > 2. Скорость потоковой передачи может отличаться от оригинального OpenAI API.
+
+---
+
+## 🎨 Генерация изображений
+
+Прокси поддерживает генерацию изображений через Qwen с OpenAI-совместимым API.
+
+### Эндпоинты
+
+| Эндпоинт | Метод | Описание |
+|----------|-------|----------|
+| `/api/image` | POST | Простой эндпоинт, возвращает PNG |
+| `/api/images/generations` | POST | OpenAI-совместимый формат |
+
+### Простой эндпоинт
+
+```bash
+curl -X POST http://localhost:3264/api/image \
+  -H "Content-Type: application/json" \
+  -d '{"prompt": "cute cat"}' \
+  -o cat.png
+```
+
+### OpenAI-совместимый эндпоинт
+
+```bash
+curl -X POST http://localhost:3264/api/images/generations \
+  -H "Content-Type: application/json" \
+  -d '{"prompt": "cute cat", "size": "1024x1024"}'
+```
+
+**Ответ:**
+
+```json
+{
+  "created": 1767058738,
+  "data": [
+    {
+      "b64_json": "iVBORw0KGgo..."
+    }
+  ]
+}
+```
+
+### Параметры
+
+| Параметр | Тип | По умолчанию | Описание |
+|----------|-----|--------------|----------|
+| `prompt` | string | — | Описание изображения (обязательный) |
+| `size` | string | `1024x1024` | Размер: `1024x1024`, `1792x1024`, `1024x1792` |
+| `response_format` | string | `b64_json` | Формат: `b64_json` или `url` |
+
+### Использование с OpenAI SDK
+
+```javascript
+import OpenAI from 'openai';
+import fs from 'fs';
+
+const openai = new OpenAI({
+  baseURL: 'http://localhost:3264/api',
+  apiKey: 'dummy',
+});
+
+const response = await openai.images.generate({
+  prompt: 'cute cat playing with yarn',
+  size: '1024x1024',
+});
+
+// Декодируем base64 и сохраняем
+const buffer = Buffer.from(response.data[0].b64_json, 'base64');
+fs.writeFileSync('cat.png', buffer);
+```
+
+### Использование с Python
+
+```python
+from openai import OpenAI
+import base64
+
+client = OpenAI(base_url="http://localhost:3264/api", api_key="dummy")
+
+response = client.images.generate(prompt="cute cat", size="1024x1024")
+
+# Сохраняем изображение
+with open("cat.png", "wb") as f:
+    f.write(base64.b64decode(response.data[0].b64_json))
+```
 
 ---
