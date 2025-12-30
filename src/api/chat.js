@@ -684,7 +684,7 @@ export async function testToken(token) {
         await page.goto(CHAT_PAGE_URL, { waitUntil: 'domcontentloaded' });
 
         const evalData = {
-            apiUrl: CHAT_API_URL,
+            apiUrl: CHAT_API_URL_V2,
             token,
             payload: {
                 chat_type: 't2t',

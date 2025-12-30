@@ -467,4 +467,73 @@ router.post('/files/upload', upload.single('file'), async (req, res) => {
     }
 });
 
+// === ГЕНЕРАЦИЯ ИЗОБРАЖЕНИЙ ===
+// OpenAI-совместимый endpoint
+router.post('/images/generations', authMiddleware, async (req, res) => {
+    try {
+        const prompt = req.body.prompt;
+        const size = req.body.size || '1024x1024';
+        
+        if (!prompt) {
+            return res.status(400).json({ error: { message: 'prompt required' } });
+        }
+        
+        // Конвертируем размер OpenAI в Qwen формат
+        const sizeMap = { '1024x1024': '1:1', '1792x1024': '16:9', '1024x1792': '9:16' };
+        const qwenSize = sizeMap[size] || '1:1';
+        
+        logInfo(`Генерация изображения: ${prompt.substring(0, 50)}...`);
+        
+        const { generateImage } = await import('./imageGen.js');
+        const result = await generateImage(prompt, qwenSize);
+        
+        if (result.error) {
+            return res.status(500).json({ error: { message: result.error } });
+        }
+        
+        // OpenAI формат ответа
+        const responseFormat = req.body.response_format || 'b64_json';
+        const data = responseFormat === 'url' 
+            ? { url: result.url }
+            : { b64_json: result.buffer?.toString('base64') };
+        res.json({ created: Math.floor(Date.now() / 1000), data: [data] });
+    } catch (error) {
+        logError('Ошибка генерации изображения', error);
+        res.status(500).json({ error: { message: error.message } });
+    }
+});
+
+// Простой endpoint - сразу отдаёт картинку
+router.post('/image', authMiddleware, async (req, res) => {
+    try {
+        const prompt = req.body.prompt;
+        const size = req.body.size || '1:1';
+        
+        if (!prompt) {
+            return res.status(400).json({ error: 'prompt required' });
+        }
+        
+        logInfo(`Генерация изображения: ${prompt.substring(0, 50)}...`);
+        
+        const { generateImage } = await import('./imageGen.js');
+        const result = await generateImage(prompt, size);
+        
+        if (result.error) {
+            return res.status(500).json({ error: result.error });
+        }
+        
+        // Если запрошен JSON
+        if (req.query.format === 'json' || req.headers.accept === 'application/json') {
+            return res.json({ url: result.url });
+        }
+        
+        // Иначе отдаём картинку
+        res.set('Content-Type', 'image/png');
+        res.send(result.buffer);
+    } catch (error) {
+        logError('Ошибка генерации изображения', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
 export default router;
