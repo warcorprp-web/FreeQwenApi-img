@@ -2,7 +2,7 @@
 import axios from 'axios';
 import { getBrowserContext } from '../browser/browser.js';
 import { logInfo, logError } from '../logger/index.js';
-import { getAuthToken, extractAuthToken } from './chat.js';
+import { getAvailableToken } from './tokenManager.js';
 import OSS from 'ali-oss';
 import fs from 'fs';
 import path from 'path';
@@ -25,24 +25,13 @@ export async function getStsToken(fileInfo) {
     try {
         logInfo(`Запрос STS токена для файла: ${fileInfo.filename}`);
         
-        const browserContext = getBrowserContext();
-        if (!browserContext) {
-            throw new Error('Браузер не инициализирован');
+        // Получаем токен из tokenManager
+        const tokenObj = await getAvailableToken();
+        if (!tokenObj?.token) {
+            throw new Error('Нет доступного токена');
         }
         
-        // Получаем токен авторизации с помощью существующей функции
-        let token = getAuthToken();
-        
-        // Если токен не найден, попробуем его извлечь
-        if (!token) {
-            logInfo('Токен авторизации не найден в памяти, пытаемся извлечь из браузера');
-            token = await extractAuthToken(browserContext);
-            
-            if (!token) {
-                throw new Error('Не удалось получить токен авторизации');
-            }
-        }
-        
+        const token = tokenObj.token;
         logInfo('Токен авторизации получен, отправляем запрос на получение STS токена');
         
         // Запрос на получение STS токена

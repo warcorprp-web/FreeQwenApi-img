@@ -536,4 +536,60 @@ router.post('/image', authMiddleware, async (req, res) => {
     }
 });
 
+// Композиция изображений
+router.post('/images/compose', authMiddleware, upload.array('files', 3), async (req, res) => {
+    try {
+        const prompt = req.body.prompt || 'объедини изображения';
+        
+        if (!req.files || req.files.length === 0) {
+            return res.status(400).json({ error: 'files required' });
+        }
+        
+        if (req.files.length > 3) {
+            return res.status(400).json({ error: 'max 3 files allowed' });
+        }
+        
+        logInfo(`Композиция ${req.files.length} изображений: ${prompt}`);
+        
+        // Загружаем все файлы в Qwen OSS
+        const uploadPromises = req.files.map(file => uploadFileToQwen(file.path));
+        const uploadResults = await Promise.all(uploadPromises);
+        
+        // Удаляем временные файлы
+        req.files.forEach(file => fs.unlinkSync(file.path));
+        
+        // Проверяем успешность загрузки
+        const failedUpload = uploadResults.find(r => !r.success);
+        if (failedUpload) {
+            return res.status(500).json({ error: 'Failed to upload files to OSS' });
+        }
+        
+        // Получаем URL загруженных файлов
+        const imageUrls = uploadResults.map(r => r.url);
+        
+        // Композиция
+        const { composeImages } = await import('./imageGen.js');
+        const result = await composeImages(imageUrls, prompt);
+        
+        if (result.error) {
+            return res.status(500).json({ error: result.error });
+        }
+        
+        res.json({ url: result.url, success: true });
+    } catch (error) {
+        logError('Ошибка композиции изображений', error);
+        
+        // Удаляем временные файлы в случае ошибки
+        if (req.files) {
+            req.files.forEach(file => {
+                if (fs.existsSync(file.path)) {
+                    fs.unlinkSync(file.path);
+                }
+            });
+        }
+        
+        res.status(500).json({ error: error.message });
+    }
+});
+
 export default router;

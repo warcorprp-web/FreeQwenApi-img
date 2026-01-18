@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Тест композиции изображений</title>
+    <style>
+        body { font-family: Arial; max-width: 800px; margin: 50px auto; padding: 20px; }
+        input, button { margin: 10px 0; padding: 10px; }
+        button { background: #007bff; color: white; border: none; cursor: pointer; }
+        button:hover { background: #0056b3; }
+        #result { margin-top: 20px; }
+        img { max-width: 100%; border: 1px solid #ddd; margin-top: 10px; }
+        .loading { color: #666; }
+    </style>
+</head>
+<body>
+    <h1>Тест композиции изображений</h1>
+    
+    <div>
+        <label>Изображение 1:</label><br>
+        <input type="file" id="file1" accept="image/*">
+    </div>
+    
+    <div>
+        <label>Изображение 2:</label><br>
+        <input type="file" id="file2" accept="image/*">
+    </div>
+    
+    <div>
+        <label>Промпт:</label><br>
+        <input type="text" id="prompt" value="объедини изображения" style="width: 100%;">
+    </div>
+    
+    <button onclick="compose()">Создать композицию</button>
+    
+    <div id="result"></div>
+
+    <script>
+        async function compose() {
+            const file1 = document.getElementById('file1').files[0];
+            const file2 = document.getElementById('file2').files[0];
+            const prompt = document.getElementById('prompt').value;
+            const result = document.getElementById('result');
+            
+            if (!file1 || !file2) {
+                alert('Выберите оба изображения');
+                return;
+            }
+            
+            result.innerHTML = '<p class="loading">Загрузка и композиция...</p>';
+            
+            const formData = new FormData();
+            formData.append('files', file1);
+            formData.append('files', file2);
+            formData.append('prompt', prompt);
+            
+            try {
+                const response = await fetch('http://localhost:3264/api/images/compose', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const data = await response.json();
+                
+                if (data.error) {
+                    result.innerHTML = `<p style="color: red;">Ошибка: ${data.error}</p>`;
+                } else {
+                    result.innerHTML = `
+                        <p style="color: green;">Успешно!</p>
+                        <img src="${data.url}" alt="Результат">
+                        <p><a href="${data.url}" target="_blank">Открыть в новой вкладке</a></p>
+                    `;
+                }
+            } catch (error) {
+                result.innerHTML = `<p style="color: red;">Ошибка: ${error.message}</p>`;
+            }
+        }
+    </script>
+</body>
+</html>
